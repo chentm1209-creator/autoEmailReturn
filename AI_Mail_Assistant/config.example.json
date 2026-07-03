@@ -1,0 +1,16 @@
+{
+  "EMAIL_ACCOUNT": "your-email@example.com",
+  "EMAIL_PASSWORD": "your-email-password-or-app-password",
+  "POP3_SERVER": "pop.example.com",
+  "SMTP_SERVER": "smtp.example.com",
+  "ALLOWED_SENDER": "sender@example.com",
+  "CC_LIST": [
+    "cc-recipient@example.com"
+  ],
+  "SLEEP_TIME": "60",
+  "REPLY_RULES": {
+    "关键字1": "这是针对关键字1的回复内容",
+    "关键字2": "这是针对关键字2的回复内容"
+  },
+  "DEFAULT_REPLY": "收到，已安排"
+}
