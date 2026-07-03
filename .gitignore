@@ -1,0 +1,15 @@
+# 忽略配置文件和本地临时文件
+config.json
+.DS_Store
+
+# Python 缓存文件
+__pycache__/
+*.py[cod]
+
+# 本地运行/状态文件
+processed_uids.txt
+last_check_time.txt
+.env
+
+# 可选的本地资源文件
+alert.mp3
