@@ -12,19 +12,6 @@ from email.header import decode_header
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import traceback
-
-# 可选的播放声音/音频依赖（不强制）
-try:
-    from playsound import playsound
-except Exception:
-    playsound = None
-
-# 可选的 OpenAI 依赖（只有当配置中开启 AI 回复并且环境变量配置好时才会使用）
-try:
-    import openai
-except Exception:
-    openai = None
-
 # 创建日志目录
 log_dir = "logs"
 if not os.path.exists(log_dir):
@@ -58,7 +45,6 @@ config = load_config()
 PROCESSED_UIDS_FILE = "processed_uids.txt"
 LAST_CHECK_TIME_FILE = "last_check_time.txt"
 
-# 从配置中读取（保持向后兼容）
 EMAIL_ACCOUNT = config.get("EMAIL_ACCOUNT")
 EMAIL_PASSWORD = config.get("EMAIL_PASSWORD")
 POP3_SERVER = config.get("POP3_SERVER")
@@ -68,11 +54,6 @@ SLEEP_TIME = int(config.get("SLEEP_TIME", 60))
 REPLY_RULES = config.get("REPLY_RULES", {})
 DEFAULT_REPLY = config.get("DEFAULT_REPLY", "收到，已安排")
 CC_LIST = config.get("CC_LIST", [])
-
-# AI 相关配置：是否使用 AI 回复、提供商、模型（API key 使用环境变量 OPENAI_API_KEY）
-USE_AI_REPLY = config.get("USE_AI_REPLY", False)
-AI_PROVIDER = config.get("AI_PROVIDER", "openai")
-OPENAI_MODEL = config.get("OPENAI_MODEL", "gpt-3.5-turbo")
 # 计算 2 天前的时间戳
 #TWO_DAYS_AGO = time.time() - (2 * 24 * 60 * 60)
 
@@ -140,15 +121,8 @@ def get_mail_server():
         server.pass_(EMAIL_PASSWORD)
         return server
     except Exception:
-        # 出错时记录日志并尝试播放告警音（如果可用）
+        # 出错时记录日志
         logger.error("连接邮件服务器时发生错误: %s", traceback.format_exc())
-        try:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            audio_file_path = os.path.join(current_dir, "alert.mp3")
-            if playsound and os.path.exists(audio_file_path):
-                playsound(audio_file_path)
-        except Exception:
-            logger.debug("播放告警音失败或不可用")
         return None
 
 def get_email_content(server, index):
@@ -202,68 +176,20 @@ def get_body(msg):
     return body.strip()
 
 def create_reply_email(original_email):
-    """创建回复邮件"""
+    """创建回复邮件（基于主题关键字匹配规则）。"""
     reply = MIMEMultipart()
     reply["From"] = EMAIL_ACCOUNT
     reply["To"] = original_email["From"]
-    reply["Subject"] = "Re: " + original_email["Subject"]
-    reply["Cc"] = ",".join(CC_LIST)  # 抄送列表
-    # 选择合适的回复内容
-    # 如果配置开启了 AI 回复，优先使用 AI 生成回复内容
+    reply["Subject"] = "Re: " + original_email.get("Subject", "")
+    reply["Cc"] = ",".join(CC_LIST)
     reply_content = DEFAULT_REPLY
     subject = decode_subject(original_email.get("Subject", ""))
-    body = get_body(original_email)
-    if USE_AI_REPLY and AI_PROVIDER == "openai":
-        try:
-            ai_text = generate_ai_reply(subject, body)
-            if ai_text:
-                reply_content = ai_text
-        except Exception:
-            logger.error("AI 生成回复失败: %s", traceback.format_exc())
-    else:
-        # 规则匹配回复（保持原有行为）
-        for keyword, response in REPLY_RULES.items():
-            if keyword in subject:
-                reply_content = response
-                break
+    for keyword, response in REPLY_RULES.items():
+        if keyword in subject:
+            reply_content = response
+            break
     reply.attach(MIMEText(reply_content, "plain"))
     return reply
-
-
-def generate_ai_reply(subject: str, body: str) -> str:
-    """使用 OpenAI（需设置环境变量 OPENAI_API_KEY）生成简洁的邮件回复文本。
-
-    返回生成的文本（字符串），如果失败返回空字符串。
-    """
-    if openai is None:
-        logger.warning("openai 库未安装，无法使用 AI 回复")
-        return ""
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        logger.warning("未配置 OPENAI_API_KEY 环境变量，跳过 AI 回复")
-        return ""
-    try:
-        openai.api_key = api_key
-        prompt = (
-            f"请根据下面的邮件主题和正文，用中文简洁礼貌地生成一段专业的回复，适用于自动回复场景。\n\n"
-            f"主题: {subject}\n\n正文: {body}\n\n只输出回复文本，不要多余说明。"
-        )
-        # 使用 ChatCompletion API
-        completion = openai.ChatCompletion.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": "你是一个邮件自动回复助手，回答要简洁、专业。"},
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=200,
-            temperature=0.2,
-        )
-        text = completion.choices[0].message.content.strip()
-        return text
-    except Exception:
-        logger.error("调用 OpenAI API 失败: %s", traceback.format_exc())
-        return ""
-
 def send_reply(reply_email, original_from=None):
     """发送回复邮件。
 

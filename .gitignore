@@ -13,3 +13,4 @@ last_check_time.txt
 
 # 可选的本地资源文件
 alert.mp3
+logs/
