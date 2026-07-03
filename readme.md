@@ -1,12 +1,8 @@
 这是一个自动邮件回复工具，基于规则自动回复符合条件的来信。
 
 运行：
-1. 安装依赖：
-```
-pip install -r requirements.txt
-```
-2. 配置 `config.json`（包括邮箱及规则）。
-3. 运行：
+1. 配置 `config.json`（包括邮箱及规则）。
+2. 运行：
 ```
 python autoEmailReturn.py
 ```
